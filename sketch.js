@@ -10,7 +10,145 @@
 // - Dictate drawing based on size threshold.
 // - Allow for expansion or contractoin of guassian deviation when running sketch.
 
-p5.disableFriendlyErrors = true;
+// Logic (idea):
+// - Two (or more) sets of positions & velocities along with backups (for bound tracking).
+// - For each set, we can define an origin??
+// - For each set, we can define bounding functions to keep them from moving too far.
+// - For each set, we can define velocities (random or vectors).
+// - Positions are then unified and fed into Voronoi system.
+// - Voronoi system is drawn, along with filters for size/etc.
+/*
+  NOTE - I like to code in a functional style, which is why this might look a bit rote.
+
+  This might look like:
+  [{
+    positions: [],
+    velocities: [],
+    _positions: [], // where positions remains static. (or maybe we redraw)
+    _velocities: [] // where velocities is updated on a per-draw cycle.
+  }, {...}]
+
+  Where the elements are:
+  CellSystem -> A group of CellBody(s)
+  CellBody -> A group of Cell(s)
+
+  So potentially this looks like:
+  
+  makeCellSystem(numCellGroups, cellsPerGroup = 40) {
+    let cellSystem = Array.from({length: numCellGroups}, (_) => {}];
+    makeCellSystemPositions(cellSystem);
+    makeCellSystemVelocities(cellSystem);
+    return cellSystem;
+  }
+
+  makeCellSystemPositions(cellSystem, cellsPerGroup) {
+    for (let i = 0; i < cellSystem.length; i++) {
+      makeCellBodyPositions(cellSystem[i], cellsPerGroup);
+    }
+    return cellSystem;
+  }
+
+  makeCellBodyPositions(cellBody, cellsPerGroup, initialCoords, initialSpread) {
+    cellBody.positions = [];
+    cellBody._positions = [];
+    for (let i = 0; i < cellsPerGroup; i++) {
+      let position = Array.from({length: 2}, (_, i) => {
+          randomGaussian(i & 1 ? intialCoords.y : initialCoords.x, initialSpread);
+        });
+
+      cellBody.positions.push(position);
+      cellBody._positions.push(position);
+    }
+  }
+  
+  makeCellBodyVelocities(cellBody, cellsPerGroup) {
+    cellBody.velocities = [];
+    cellBody._velocities = [];
+    for (let i = 0; i < cellsPerGroup; i++) {
+      let velocity = Array.from({length: 2}, (_, _) => {
+          RAND(-0.1, 0.1);
+        }
+      
+      cellBody.velocities.push(velocity);
+      cellBody._velocities.push(velocity);
+    }
+  }
+
+  Then, we need to start interfacing these with the Voronoi system, which might look like:
+
+  let voronoiSystem = makeVoronoiSystem(extents);
+
+  function makeVoronoiSystem(extents = [[0, 0], [W, H]]) {
+    return d3.voronoi.extent(extents[0], extents[1]); 
+  }
+
+  let voronoiPolygons = getVoronoiPolygons(VoronoiSystem, CellSystem);
+
+  function getVoronoiPolygons(VoronoiSystem, cellSystem) {
+    let positions = [];
+    cellSystem.forEach(cellBody => {
+        positions.concat(cellBody.positions);
+    });
+    return VoronoiSystem(positions).polygons();
+  }
+
+  function getVoronoiVertices(VoronoiPolygons, CellSystem) {
+    let cellQty = CellSystem.reduce((accum, curr) => accum + curr.positions.length, 0);
+    let vertices = [];
+
+    for (let i = 0; i < cellQty, i++) {
+      let vertices = VoronoiPolygons[i].map(v => createVector(v[0], v[1]));
+      let rounded = roundCorners(vertices, 15);
+      vertices.push(rounded);
+    }
+  }
+
+  The Voronoi polygons are necessary so that we can eventually grab their vertices and draw 
+  them out.
+
+  In the meantime, we also have to "move" each Cell in our CellBody (i.e. "tick" each draw cycle)
+
+  This might look like:
+
+  tickCellBodySystem(cellBodySystem);
+
+  function tickCellBodySystem(cellBodySystem) {
+    cellBodySystem.forEach(cellBody => {
+      tickCellBody(cellBody);
+    });
+  }
+
+  function tickCellBody(cellBody) {
+    for (let i = 0; i < cellBody.length; i++) {
+      let cellPosition = cellBody.positions[i];
+      let cellVelocity = cellBody.velocity[i];
+
+      cellBody._velocity[i] = cellBody.velocity[i];
+      [cellBody.positions[i], cellBody.velocity[i]] = tickCell(cellPosition, cellVelocity);
+    }
+  }
+
+  tickCell(cellPosition, cellVelocity) {
+    // EULER
+    cellVelocity[0] += RAND(-0.1, 0.1)
+    cellVelocity[1] += RAND(-0.1, 0.1)
+    cellPosition[0] += cellVelocity[0]
+    cellPosition[1] += cellVelocity[1]
+    cellVelocity[0] *= 0.99
+    cellVelocity[1] *= 0.99
+
+    constrainCell(cellPosition, cellVelocity);
+    return [cellPosition, cellVelocity];
+  }
+
+  function constrainCell(cellPosition, cellVelocity) {
+    // Flip velocity
+    if (cellPosition[0] >= W-4 || p <= 4) cellVelocity[0] *= -1 
+    if (cellPosition[1] >= H-4 || p <= 4) cellVelocity[1] *= -1
+  }
+
+*/
+p5.disableFriendlyErrors = true; // Better Debug
 
 const NUMA = 40; // Number of cells
 const NUMB = 40;
